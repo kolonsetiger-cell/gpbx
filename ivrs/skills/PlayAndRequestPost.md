@@ -1,0 +1,133 @@
+# PlayAndRequestPost — 播放等待音并发送 POST 请求
+
+播放等待音（如音乐），同时向后端发送 JSON POST 请求，等待响应后继续。
+
+## 节点定义（来源: `skill.lua`）
+
+```lua
+local PlayAndRequestPost = {}
+PlayAndRequestPost.__index = PlayAndRequestPost
+function PlayAndRequestPost:new(file, url, body, timeout)
+    local self = setmetatable({}, PlayAndRequestPost)
+    self.file = file
+    self.url = url
+    self.body = body
+    self.timeout = timeout
+    self.parent_node = nil
+    self.outputs = nil
+    self.error = nil
+    self.success_node = nil
+    self.fail_node = nil
+    return self
+end
+
+function PlayAndRequestPost:do_action()
+    local response, err = engine:play_and_request_post(self.file, self.url, self.body, self.timeout)
+    if err ~= nil then
+        return self.fail_node
+    end
+    self.outputs = self.parent_node.outputs
+    table.insert(self.outputs, response)
+    return self.success_node
+end
+
+function PlayAndRequestPost:success_connect(node)
+    self.success_node = node
+    if node == nil then
+        return self
+    end
+    node.parent_node = self
+    return self
+end
+
+function PlayAndRequestPost:fail_connect(node)
+    self.fail_node = node
+    if node == nil then
+        return self
+    end
+    node.parent_node = self
+    return self
+end
+```
+
+## 构造参数
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `file` | string | 等待音文件（通常 `"local_stream://moh"` 音乐保持） |
+| `url` | string | POST 请求的 URL |
+| `body` | table | 请求体（JSON 对象） |
+| `timeout` | number | 超时时间(毫秒) |
+
+## 方法
+
+| 方法 | 说明 |
+|------|------|
+| `success_connect(node)` | `err == nil` 时的后续节点 |
+| `fail_connect(node)` | `err ~= nil` 时的后续节点 |
+| `do_action()` | 调用 `play_and_request_post`，返回 success_node 或 fail_node |
+
+## 输出
+
+`self.outputs` 追加 `response`（服务端响应数据，通常含 `.code` 字段）
+
+## 使用样例（来源: `demo.lua`）
+
+### 首次校验
+
+```lua
+local node_check_6_digits = PlayAndRequestPost:new(
+    "local_stream://moh",                    -- 等待音
+    check_url,                                -- 校验接口
+    {session_id = engine:get_uuid()},         -- 请求体
+    10000                                     -- 超时
+)
+
+node_check_6_digits:success_connect(node_6_digits_ifelse_check)  -- 请求成功 → 判断结果
+node_check_6_digits:fail_connect(nil)                             -- 网络错误 → 挂断
+```
+
+### 循环内重新校验
+
+```lua
+local node_retry_check = PlayAndRequestPost:new(
+    "local_stream://moh",
+    check_url,
+    {session_id = engine:get_uuid()},
+    10000
+)
+
+node_retry_check:success_connect(node_retry_ifelse)   -- 请求成功 → 判断结果
+node_retry_check:fail_connect(node_retry_loop)         -- 网络错误 → 回到 Loop
+```
+
+### 判断响应结果（配合 IfElse）
+
+```lua
+local ifelse = IfElse:new()
+ifelse:if_connect(function(self)
+    local response = self.outputs[#self.outputs]
+    local code = response.code
+    if code ~= 200 then
+        return false
+    end
+    return true
+end, node_success)        -- code == 200 → 进入下一阶段
+ifelse:else_connect(node_retry_loop)  -- code != 200 → 重试
+```
+
+## 与 HttpPost 的区别
+
+| | PlayAndRequestPost | HttpPost |
+|------|------|------|
+| 是否播放语音 | 是（等待音） | 否 |
+| 引擎调用 | `play_and_request_post` | `post_json` |
+| 成功条件 | `err == nil` | `code == 200 && err == nil` |
+| 返回值 | `response, err` | `code, response, err` |
+| 典型场景 | 校验等待（有等待音） | 通知、上报（无感知） |
+
+## 典型流程
+
+```
+PlayAndGetDigits(输入) → Playback(等待提示) → PlayAndRequestPost(校验) → IfElse(判断)
+```

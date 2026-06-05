@@ -1,0 +1,7 @@
+	agent {
+		TenantId 11
+		AgentId 80000
+		AgentName 测试
+		ExtensionId 10000
+		CreateTime 1777703240861
+	}

@@ -1,0 +1,93 @@
+# 自身对外可访问 host IP
+external_ip 192.168.0.108
+
+# freeswitch 连接地址，只能配置一个，和GPBX服务是一对一关系
+freeswitch {
+    addr                        127.0.0.1:8021
+    user
+    pass                        ClueCon
+    Reconnect_Interval_Second   5
+}
+
+# 后端通知地址，主要通知会话状态
+backend {
+    timeout                 5
+#    session_create          http://192.168.0.108:8080/session/create
+#    session_answer          http://192.168.0.108:8080/session/answer
+#    session_state           http://192.168.0.108:8080/session/state
+#    session_hangup          http://192.168.0.108:8080/session/hangup
+#    session_destroy         http://192.168.0.108:8080/session/destroy
+}
+
+# http 服务服务地址
+http {
+    host                    0.0.0.0
+    manager_port            8080
+    agent_port              8081
+    api_port                8082
+    enable_ssl              false
+
+    admin {
+        username             admin
+        password             admin123
+    }
+}
+
+# ASR 相关配置，默认的配置
+asr {
+    # ASR 默认通知地址
+#    callback                http://192.168.2.254:8080/robot/asr/notify
+}
+
+# 存储相关配置
+# 文件系统存储: path file://.db
+# SQLite 数据库: path sqlite://.db/gpbx.db
+store {
+    path                    sqlite://.db/gpbx.db
+}
+
+# 鉴权相关配置
+jwt {
+    expire_hours            1
+    secret                  b6064a15f6775c26111e60a8ce658a4d
+
+    refresh_expire_hours    2
+}
+
+llm {
+    type                    openai
+    model                   qwen2.5-7b-instruct
+    baseurl                 http://41.10.1.7:1234/v1
+    token                   test
+    max_history             10
+}
+
+#llm {
+#    type                    dify
+#    baseurl                 http://192.168.2.254/v1
+#    token                   app-BlLR2NxCt0BrV0O97sl95KMy
+#    model                   agent
+#}
+
+agent {
+    ws_addr                 ws://$external_ip:$http.agent_port/agent
+}
+
+sip {
+    ws_addr                 ws://192.168.2.254:5066
+    domain                  192.168.2.254
+    default_password        b6064a
+}
+
+# Telegram Bot 配置
+telegram_bot {
+    server_port             8083
+    token                   ""
+    enable                  false
+    bind_script             "telegram_bots/10000.lua"
+    proxy                   "http://127.0.0.1:8800"
+    to_ivrid                10001
+    tenant_id               20000
+    number                  10000
+    timeout                 10
+}

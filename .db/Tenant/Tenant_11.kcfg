@@ -1,0 +1,7 @@
+	tenant {
+		TenantId 11
+		TenantName 11
+		CreateTime 1775223128000
+		ExpireTime 0
+		DefaultNumber 
+	}

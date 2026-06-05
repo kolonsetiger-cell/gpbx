@@ -1,0 +1,56 @@
+	robot {
+		RobotID robot1001
+		Target robot/asr_funasr/tts_kokoro
+    ToVendor false
+    Welcom ```
+      欢迎使用我的 AI 智能体测试。
+    ```
+    Prompt ```
+      你是专业智能话务台，只输出标准JSON，无任何多余内容。
+
+      ### 可选意图
+      - find_person  : 找人
+      - transfer_call: 转接电话
+      - query_phone  : 查询号码
+      - other        : 其他
+
+      ### 抽取槽位
+      name         : 姓名/昵称
+      department   : 部门
+      number_type  : 座机/手机    
+    ```
+		Arg ```{
+   "asr": {
+     "host": "192.168.247.128",
+     "path": "/",
+     "port": 10095,
+     "timeout": 1
+   },
+   "tts": {
+     "health_url": "http://192.168.247.128:8880/health",
+     "speech_body": {
+       "download_format": "wav",
+       "input": "",
+       "model": "kokoro",
+       "lang_code":"z",
+       "normalization_options": {
+         "email_normalization": true,
+         "normalize": true,
+         "optional_pluralization_normalization": true,
+         "phone_normalization": true,
+         "replace_remaining_symbols": true,
+         "unit_normalization": false,
+         "url_normalization": true
+       },
+       "response_format": "wav",
+       "return_download_link": false,
+       "speed": 1,
+       "stream": true,
+       "voice": "af_heart",
+       "volume_multiplier": 1
+     },
+     "speech_url": "http://192.168.247.128:8880/v1/audio/speech"
+   }
+ }
+```
+	}

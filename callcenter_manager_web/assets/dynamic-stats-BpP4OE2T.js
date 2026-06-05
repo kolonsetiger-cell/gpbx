@@ -1,0 +1,1 @@
+import{_ as t}from"./dynamic-stats.vue_vue_type_script_setup_true_lang-BvU_ZMZ0.js";import"./index-DOwPIxde.js";import"./index-Dm2soz1q.js";import"./index-DRA6_MrW.js";/* empty css                     */export{t as default};

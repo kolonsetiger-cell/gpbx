@@ -1,0 +1,9 @@
+	user {
+		ID 0
+		Username admin
+		Password $2a$10$pHTZfupi3ZqYDNo6bEdhieuS4I1CsV8LOc3ognWSc9L16F8PXXt3C
+		Name 管理员
+		Roles R_SUPER
+		CreateTime 0
+		UpdateTime 0
+	}

@@ -1,0 +1,34 @@
+{
+    "Lua.diagnostics.globals": [
+        "engine",
+        "freeswitch",
+        "format_originator_string",
+        "urlEncode",
+        "urlDecode",
+        "end_menu",
+        "printTable",
+        "hear_error_menu",
+        "not_find_intent_menu",
+        "first_menu",
+        "argv",
+        "menu_2",
+        "menu_3_failed",
+        "menu_3",
+        "menu_3_falied",
+        "menu_3_check"
+    ],
+    "Lua.diagnostics.disable": [
+        "undefined-field",
+        "redefined-local",
+        "need-check-nil"
+    ],
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "driver": "SQLite",
+            "name": "gpbx",
+            "database": ".db/gpbx.db"
+        }
+    ],
+    "sqltools.useNodeRuntime": true
+}

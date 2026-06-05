@@ -1,0 +1,116 @@
+function printTable(t, indent)
+    indent = indent or 0
+    local prefix = string.rep("  ", indent)
+    local res = ""
+    for k, v in pairs(t) do
+        if type(v) == "table" then
+            res = res .. prefix .. tostring(k) .. " = {\n"
+            res = res .. printTable(v, indent + 1)
+            res = res .. prefix .. "}\n"
+        else
+            res = res .. prefix .. tostring(k) .. " = " .. tostring(v) .. "\n"
+        end
+    end
+    return res
+end
+
+local function event_callback(event, data)
+    engine:log('info', 'event_callback: ' .. event .. ' ' .. data)
+end
+engine:set_callback(event_callback)
+
+local retry_times = 3
+local check_url = "http://127.0.0.1:8083/api/check"
+local check_url2 = "http://127.0.0.1:8083/api/check"
+local notify_url = "http://127.0.0.1:8083/api/ensure"
+local get_digits = ""
+local response = {}
+local err = ""
+local file_dir = "C:\\Users\\kolonse\\ivrs\\"
+local menu_1 = file_dir .. "menu_1.wav"
+local menu_2 = file_dir .. "menu_2.wav"
+local menu_3 = file_dir .. "menu_3.wav"
+local menu_3_failed = file_dir .. "menu_3_failed.wav"
+local menu_3_success = file_dir .. "menu_3_success.wav"
+local menu_4 = file_dir .. "menu_4.wav"
+local menu_4_failed = file_dir .. "menu_4_failed.wav"
+local menu_4_success = file_dir .. "menu_4_success.wav"
+engine:sleep(1000)
+
+while engine:is_ok() do
+
+::menu_1::
+    local get_digit = engine:play_and_get_digit(menu_1, "1", 10000)
+    if #get_digit == 0 then
+        goto end_menu
+    end
+    engine:post_json(notify_url, {}, {session_id = engine:get_uuid()}, 10000)
+::menu_2::
+    get_digits = engine:play_and_get_digits(menu_2, 6, 10000)
+    if #get_digits == 0 then
+        retry_times = 3
+        goto menu_3_check_failed
+    end
+
+::menu_2_check::
+    engine:playback(menu_3)
+    retry_times = 3
+    goto menu_3_request
+
+-- 把失败标签移到 局部变量 response 之前，解决跳转报错
+::menu_3_check_failed::
+    if retry_times < 0 then
+        goto end_menu
+    end
+    retry_times = retry_times - 1
+    get_digits = engine:play_and_get_digits(menu_3_failed, 6, 10000)
+    if #get_digits == 0 then
+        goto menu_3_check_failed
+    end
+
+::menu_3_request::
+    response, err = engine:play_and_request_post("local_stream://moh", check_url, { digits = get_digits, session_id = engine:get_uuid()}, 10000)
+    if err ~= nil then
+        engine:log('error', 'menu_3_request error: ' .. err)
+        goto menu_3_check_failed
+    end
+    printTable(response)
+    if response ~= nil and response.code == 0 then
+        goto menu_3_check_success
+    end
+    goto menu_3_check_failed
+
+::menu_3_check_success::
+    engine:playback(menu_3_success)
+    get_digits = engine:play_and_get_digits(menu_4, 4, 10000)
+    if #get_digits == 0 then
+        goto end_menu
+    end
+    retry_times = 3
+    goto menu_4_request
+    
+-- 把失败标签移到 局部变量 response 之前
+::menu_4_check_failed::
+    if retry_times < 0 then
+        goto end_menu
+    end
+    retry_times = retry_times - 1
+    get_digits = engine:play_and_get_digits(menu_4_failed, 4, 10000)
+    if #get_digits == 0 then
+        goto menu_4_check_failed
+    end
+
+::menu_4_request::
+    local response, _ = engine:play_and_request_post("local_stream://moh", check_url2, { digits = get_digits, session_id = engine:get_uuid()}, 10000)
+    if response ~= nil and response.code == 0 then
+        goto menu_4_check_success
+    end
+    goto menu_4_check_failed
+
+::menu_4_check_success::
+    engine:playback(menu_4_success)
+    break
+end
+
+::end_menu::
+engine:log('info', 'IVR End')

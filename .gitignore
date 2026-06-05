@@ -1,0 +1,11 @@
+gpbx.exe
+gpbx
+logs
+sign_tool/sign_tool.exe
+sign_tool/kolonse*
+sign_tool/sign_tool
+kolonse*
+kolonse.pub
+.db/gpbx.db-shm
+.db/gpbx.db-wal
+*.exe

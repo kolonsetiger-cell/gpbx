@@ -1,0 +1,10 @@
+	tenant_number {
+		Number 800000
+		TenantId 11
+		CreateTime 0
+		ExpireTime 0
+		Action 1
+		WayType gateway
+		Way 1111
+		RobotID robot1001
+	}
