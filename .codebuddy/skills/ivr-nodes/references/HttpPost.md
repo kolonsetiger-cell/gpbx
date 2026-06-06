@@ -8,7 +8,7 @@
 local HttpPost = {}
 HttpPost.__index = HttpPost
 function HttpPost:new(url, header, body, timeout)
-    local self = setmetatable({}, HttpPost)
+    local self = setmetatable({}, PlayAndGetDigit)
     self.url = url
     self.header = header
     self.body = body
@@ -18,11 +18,23 @@ function HttpPost:new(url, header, body, timeout)
     self.error = nil
     self.success_node = nil
     self.fail_node = nil
+    self.bindings = {}
     return self
 end
 
+function HttpPost:bind_node_output(func_bind)
+    table.insert(self.bindings, func_bind)
+end
+
 function HttpPost:do_action()
-    local code, response, err = engine:post_json(self.url, {}, {session_id = engine:get_uuid()}, 10000)
+    for _, binding in ipairs(self.bindings) do
+        local body = binding(self)
+        if body ~= nil then
+            deepMerge(self.body, body)
+        end
+    end
+
+    local code, response, err = engine:post_json(self.url, {}, self.body, 10000)
     self.outputs = self.parent_node.outputs
     if code ~= 200 or err ~= nil then
         return self.fail_node
@@ -65,7 +77,21 @@ end
 |------|------|
 | `success_connect(node)` | HTTP 200 且无错误的后续节点 |
 | `fail_connect(node)` | 非 200 或有错误的后续节点 |
-| `do_action()` | 调用 `post_json`，返回 success_node 或 fail_node |
+| `bind_node_output(func_bind)` | 绑定前驱节点的输出，动态注入到 `self.body` |
+| `do_action()` | 执行 bindings 合并 → 调用 `post_json`，返回 success_node 或 fail_node |
+
+## bindings 机制
+
+与 `PlayAndRequestPost` 相同，`bind_node_output` 允许在发送请求前，将上游节点的输出动态注入到请求体中：
+
+```lua
+local notify = HttpPost:new(notify_url, {}, {session_id = engine:get_uuid()}, 10000)
+
+notify:bind_node_output(function(self)
+    local input_node = self.parent_node  -- 如 PlayAndGetDigit
+    return {pressed_key = input_node.output}
+end)
+```
 
 ## 输出
 
@@ -86,6 +112,23 @@ local node_notify_digit_1 = HttpPost:new(
 -- 成功失败都继续（通知不需要阻塞流程）
 node_notify_digit_1:success_connect(node_recv_6_digits)
 node_notify_digit_1:fail_connect(node_recv_6_digits)
+```
+
+### 带 bindings 的通知
+
+```lua
+local node_notify = HttpPost:new(
+    notify_url, {}, {session_id = engine:get_uuid()}, 10000
+)
+
+-- 将按键值注入通知 body
+node_notify:bind_node_output(function(self)
+    local digit_node = self.parent_node  -- PlayAndGetDigit
+    return {pressed_key = digit_node.output}
+end)
+
+node_notify:success_connect(node_next)
+node_notify:fail_connect(node_next)
 ```
 
 ### 流程位置
@@ -110,4 +153,5 @@ Root → PlayAndGetDigit(按1) → HttpPost(通知) → PlayAndGetDigits(输入)
 
 ## 注意事项
 
-- `do_action()` 中硬编码了 `self.header` → `{}`，`self.body` → `{session_id = engine:get_uuid()}`，构造时的 `header` 和 `body` 参数实际上未在 `do_action` 中使用。如需自定义 body，建议使用 `PlayAndRequestPost`。
+- `do_action()` 中 `header` 参数未使用（始终传 `{}`），`body` 使用 `self.body` 参数化，构造时的 `body` 参数会在 `do_action` 中实际使用。
+- 可通过 `bind_node_output` 将上游节点的输出动态合并到 `self.body` 中。

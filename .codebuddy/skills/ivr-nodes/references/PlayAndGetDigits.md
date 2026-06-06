@@ -17,6 +17,7 @@ function PlayAndGetDigits:new(file, hope_len, timeout)
     self.error = nil
     self.success_node = nil
     self.fail_node = nil
+    self.output = nil
     return self
 end
 
@@ -26,6 +27,7 @@ function PlayAndGetDigits:do_action()
     if #get_digits == 0 then
         return self.fail_node
     end
+    self.output = get_digits
     table.insert(self.outputs, {result = get_digits})
     return self.success_node
 end
@@ -64,6 +66,12 @@ end
 | `success_connect(node)` | 输入成功后的下一个节点 |
 | `fail_connect(node)` | 超时/无输入后的下一个节点 |
 | `do_action()` | 调用 `play_and_get_digits`，返回 success_node 或 fail_node |
+
+## 字段
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `output` | string/nil | 本次输入的数字字符串，绑定（`bind_node_output`）时可直接访问 |
 
 ## 输出
 

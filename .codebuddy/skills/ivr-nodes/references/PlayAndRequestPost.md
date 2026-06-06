@@ -18,10 +18,22 @@ function PlayAndRequestPost:new(file, url, body, timeout)
     self.error = nil
     self.success_node = nil
     self.fail_node = nil
+    self.bindings = {}
     return self
 end
 
+function PlayAndRequestPost:bind_node_output(func_bind)
+    table.insert(self.bindings, func_bind)
+end
+
 function PlayAndRequestPost:do_action()
+    for _, binding in ipairs(self.bindings) do
+        local body = binding(self)
+        if body ~= nil then
+            deepMerge(self.body, body)
+        end
+    end
+
     local response, err = engine:play_and_request_post(self.file, self.url, self.body, self.timeout)
     if err ~= nil then
         return self.fail_node
@@ -65,7 +77,26 @@ end
 |------|------|
 | `success_connect(node)` | `err == nil` 时的后续节点 |
 | `fail_connect(node)` | `err ~= nil` 时的后续节点 |
-| `do_action()` | 调用 `play_and_request_post`，返回 success_node 或 fail_node |
+| `bind_node_output(func_bind)` | 绑定前驱节点的输出，动态注入到 `self.body` |
+| `do_action()` | 执行 bindings 合并 → 调用 `play_and_request_post`，返回 success_node 或 fail_node |
+
+## bindings 机制
+
+`bind_node_output` 允许在发送请求前，将上游节点的输出动态注入到请求体中：
+
+```lua
+local check = PlayAndRequestPost:new("local_stream://moh", check_url, {session_id = engine:get_uuid()}, 10000)
+
+-- 绑定：将前驱节点的 output 注入到 body
+check:bind_node_output(function(self)
+    local input_node = self.parent_node  -- 前驱节点（如 PlayAndGetDigits）
+    return {input_value = input_node.output}
+end)
+```
+
+- 每个 binding 函数接收当前节点 `self`，返回一个 table
+- 返回值通过 `deepMerge` 合并到 `self.body`
+- 返回 `nil` 则不合并
 
 ## 输出
 
@@ -85,6 +116,26 @@ local node_check_6_digits = PlayAndRequestPost:new(
 
 node_check_6_digits:success_connect(node_6_digits_ifelse_check)  -- 请求成功 → 判断结果
 node_check_6_digits:fail_connect(nil)                             -- 网络错误 → 挂断
+```
+
+### 带 bindings 的校验
+
+```lua
+local node_check = PlayAndRequestPost:new(
+    "local_stream://moh",
+    check_url,
+    {session_id = engine:get_uuid()},  -- 基础 body
+    10000
+)
+
+-- 将前驱节点的输入值注入到 body
+node_check:bind_node_output(function(self)
+    local input_node = self.parent_node  -- PlayAndGetDigits / PlayAndGetDigitsWithEnd
+    return {input = input_node.output}   -- 合并到 self.body
+end)
+
+node_check:success_connect(node_ifelse)
+node_check:fail_connect(nil)
 ```
 
 ### 循环内重新校验

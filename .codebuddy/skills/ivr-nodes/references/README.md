@@ -9,6 +9,7 @@
 | Root | [Root.md](./Root.md) | 流程入口 | 无 |
 | PlayAndGetDigit | [PlayAndGetDigit.md](./PlayAndGetDigit.md) | 播放+单键输入 | `play_and_get_digit` |
 | PlayAndGetDigits | [PlayAndGetDigits.md](./PlayAndGetDigits.md) | 播放+多位输入 | `play_and_get_digits` |
+| PlayAndGetDigitsWithEnd | [PlayAndGetDigitsWithEnd.md](./PlayAndGetDigitsWithEnd.md) | 播放+多位输入(结束键) | `play_and_get_digits_with_end` |
 | PlayAndRequestPost | [PlayAndRequestPost.md](./PlayAndRequestPost.md) | 播放等待音+POST | `play_and_request_post` |
 | IfElse | [IfElse.md](./IfElse.md) | 条件判断 | 无 |
 | HttpPost | [HttpPost.md](./HttpPost.md) | 纯POST请求 | `post_json` |
@@ -22,9 +23,11 @@
 | 播放后挂断 | `Playback → nil` |
 | 单键菜单 | `PlayAndGetDigit → IfElse → ...` |
 | 多位输入校验 | `PlayAndGetDigits → Playback → PlayAndRequestPost → IfElse` |
+| 不定长输入校验 | `PlayAndGetDigitsWithEnd → PlayAndRequestPost(bind_node_output) → IfElse` |
 | 校验+重试 | 上面 + `Loop` |
 | 无声通知 | `HttpPost`（成功失败都继续） |
 | 等待+校验 | `PlayAndRequestPost → IfElse` |
+| 动态注入上游输出 | `PlayAndRequestPost:bind_node_output` / `HttpPost:bind_node_output` |
 
 ## 完整流程示例（来源: `demo.lua`）
 
@@ -71,3 +74,18 @@ local digit = self.outputs[#self.outputs][1]  -- "1"
 -- 获取 PlayAndGetDigits 的输入
 local digits = self.outputs[#self.outputs].result  -- "123456"
 ```
+
+## bind_node_output 绑定模式
+
+`PlayAndRequestPost` 和 `HttpPost` 支持 `bind_node_output`，可将上游节点的 `self.output` 字段动态注入到请求体：
+
+```lua
+-- 上游节点（如 PlayAndGetDigitsWithEnd）执行后 self.output = 用户输入
+-- 下游节点通过 bind_node_output 访问
+check_node:bind_node_output(function(self)
+    local input_node = self.parent_node  -- 访问前驱节点
+    return {account = input_node.output} -- 注入到 body
+end)
+```
+
+此模式替代了手动在构造时硬编码 body 的方式，使请求体可以动态包含用户输入。
