@@ -171,6 +171,8 @@ func (p *BotBody) OnCallNumber(number string) error {
 		Type:          "to_ivr",
 		IvrID:         ivrId,
 		Timeout:       int(p.cfg.Timeout),
+		OriginateType: "ims",
+		OriginateArg:  fmt.Sprintf("%v:%v", selectedExt.NetworkIP, selectedExt.NetworkPort),
 	}
 	globalBotManager.Set(uid, p)
 	err = pbx.OriginateToIvr(req_obj)
@@ -239,6 +241,8 @@ func (p *BotBody) OnTestNumber(number string) error {
 		Type:          "to_ivr",
 		IvrID:         ivrId,
 		Timeout:       int(p.cfg.Timeout),
+		OriginateType: "ims",
+		OriginateArg:  fmt.Sprintf("%v:%v", selectedExt.NetworkIP, selectedExt.NetworkPort),
 	}
 	globalBotManager.Set(uid, p)
 	err = pbx.OriginateToIvr(req_obj)
