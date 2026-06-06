@@ -1,3 +1,19 @@
+local function deepMerge(t1, t2)
+    local result = {}
+    for k, v in pairs(t1) do
+        result[k] = v
+    end
+    for k, v in pairs(t2) do
+        if type(v) == "table" and type(result[k]) == "table" then
+            -- 子表递归合并
+            result[k] = deepMerge(result[k], v)
+        else
+            result[k] = v
+        end
+    end
+    return result
+end
+
 local Root = {}
 Root.__index = Root
 function Root:new()
@@ -77,6 +93,7 @@ function PlayAndGetDigits:new(file, hope_len, timeout)
     self.error = nil
     self.success_node = nil
     self.fail_node = nil
+    self.output = nil
     return self
 end
 
@@ -86,6 +103,7 @@ function PlayAndGetDigits:do_action()
     if #get_digits == 0 then
         return self.fail_node
     end
+    self.output = get_digits
     table.insert(self.outputs, {result = get_digits})
     return self.success_node
 end
@@ -107,6 +125,52 @@ function PlayAndGetDigits:fail_connect(node)
     node.parent_node = self
     return self
 end
+
+local PlayAndGetDigitsWithEnd = {}
+PlayAndGetDigitsWithEnd.__index = PlayAndGetDigitsWithEnd
+function PlayAndGetDigitsWithEnd:new(file, hope_dtmf, timeout)
+    local self = setmetatable({}, PlayAndGetDigitsWithEnd)
+    self.file = file
+    self.hope_dtmf = hope_dtmf
+    self.timeout = timeout
+    self.parent_node = nil
+    self.outputs = nil
+    self.error = nil
+    self.success_node = nil
+    self.fail_node = nil
+    self.output = nil
+    return self
+end
+
+function PlayAndGetDigitsWithEnd:do_action()
+    local get_digits = engine:play_and_get_digits_with_end(self.file, self.hope_dtmf, self.timeout)
+    self.outputs = self.parent_node.outputs
+    if #get_digits == 0 then
+        return self.fail_node
+    end
+    self.output = get_digits
+    table.insert(self.outputs, {result = get_digits})
+    return self.success_node
+end
+
+function PlayAndGetDigitsWithEnd:success_connect(node)
+    self.success_node = node
+    if node == nil then
+        return self
+    end
+    node.parent_node = self
+    return self
+end
+
+function PlayAndGetDigitsWithEnd:fail_connect(node)
+    self.fail_node = node
+    if node == nil then
+        return self
+    end
+    node.parent_node = self
+    return self
+end
+
 -- play_and_request_post
 local PlayAndRequestPost = {}
 PlayAndRequestPost.__index = PlayAndRequestPost
@@ -121,13 +185,22 @@ function PlayAndRequestPost:new(file, url, body, timeout)
     self.error = nil
     self.success_node = nil
     self.fail_node = nil
+    self.bindings = {}
     return self
 end
 
--- function PlayAndRequestPost:use_last_node_output(keys)
--- end
+function PlayAndRequestPost:bind_node_output(func_bind)
+    table.insert(self.bindings, func_bind)
+end
 
 function PlayAndRequestPost:do_action()
+    for _, binding in ipairs(self.bindings) do
+        local body = binding(self)
+        if body ~= nil then
+            deepMerge(self.body, body)
+        end
+    end
+
     local response, err = engine:play_and_request_post(self.file, self.url, self.body, self.timeout)
     if err ~= nil then
         return self.fail_node
@@ -223,8 +296,19 @@ function HttpPost:new(url, header, body, timeout)
     return self
 end
 
+function HttpPost:bind_node_output(func_bind)
+    table.insert(self.bindings, func_bind)
+end
+
 function HttpPost:do_action()
-    local code, response, err = engine:post_json(self.url, {}, {session_id = engine:get_uuid()}, 10000)
+    for _, binding in ipairs(self.bindings) do
+        local body = binding(self)
+        if body ~= nil then
+            deepMerge(self.body, body)
+        end
+    end
+
+    local code, response, err = engine:post_json(self.url, {}, self.body, 10000)
     self.outputs = self.parent_node.outputs
     if code ~= 200 or err ~= nil then
         return self.fail_node

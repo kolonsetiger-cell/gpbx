@@ -127,14 +127,14 @@ func (l *LuaEngine) PlayAndGetDtmfs(file string, hope_len int, timeout int) stri
 	defer l.EnableDtmf(false)
 	step := 50
 	cur := 0
-	dtmfs := ""
+	var dtmfs strings.Builder
 	for l.IsOk() && cur < timeout {
-		dtmfs += l.GetDtmfs()
-		if len(dtmfs) >= hope_len {
+		dtmfs.WriteString(l.GetDtmfs())
+		if len(dtmfs.String()) >= hope_len {
 			if !play_done {
 				pbx.ApiBreak(l.session_id)
 			}
-			return dtmfs[:hope_len]
+			return dtmfs.String()[:hope_len]
 		}
 
 		if play_done {
@@ -145,8 +145,45 @@ func (l *LuaEngine) PlayAndGetDtmfs(file string, hope_len int, timeout int) stri
 	return ""
 }
 
+func (l *LuaEngine) PlayAndGetDtmfsWithEnd(file string, hope_dtmf string, timeout int) string {
+	play_done := false
+	go func() {
+		pbx.SessionPlayback(l.session_id, file, timeout/1000)
+		play_done = true
+	}()
+	l.EnableDtmf(true)
+	defer l.EnableDtmf(false)
+	step := 50
+	cur := 0
+	var dtmfs strings.Builder
+	for l.IsOk() && cur < timeout {
+		dtmf := l.GetDtmfs()
+		if len(dtmf) > 0 {
+			for _, d := range dtmf {
+				idx := strings.Index(hope_dtmf, string(d))
+				if idx >= 0 {
+					dtmfs.WriteString(dtmf[:idx])
+					if !play_done {
+						pbx.ApiBreak(l.session_id)
+					}
+					return dtmfs.String()
+				} else {
+					dtmfs.WriteString(dtmf)
+				}
+			}
+		}
+		if play_done {
+			cur += step
+		}
+		time.Sleep(time.Millisecond * time.Duration(step))
+	}
+	return ""
+}
+
 func (l *LuaEngine) PlayAndRequest(file string, url string, body map[string]any, timeout int) (map[string]any, error) {
-	pbx.SessionPlaybackAsync(l.session_id, file)
+	if file != "" {
+		pbx.SessionPlaybackAsync(l.session_id, file)
+	}
 	_, response, err := l.PostJson(url, nil, body, timeout)
 	l.Break()
 	if err != nil {
@@ -497,6 +534,15 @@ func (l *LuaEngine) do() {
 			hope_len := ls.CheckNumber(3)
 			timeout_ms := ls.CheckNumber(4)
 			ret := l.PlayAndGetDtmfs(file, int(hope_len), int(timeout_ms))
+			ls.Push(lua.LString(ret))
+			return 1
+		}))
+		l.lu.SetField(table, "play_and_get_digits_with_end", l.lu.NewFunction(func(ls *lua.LState) int {
+			ls.CheckTable(1)
+			file := ls.CheckString(2)
+			hope_dtmf := ls.CheckString(3)
+			timeout_ms := ls.CheckNumber(4)
+			ret := l.PlayAndGetDtmfsWithEnd(file, hope_dtmf, int(timeout_ms))
 			ls.Push(lua.LString(ret))
 			return 1
 		}))
