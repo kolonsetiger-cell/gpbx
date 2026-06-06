@@ -332,12 +332,6 @@ WantedBy=multi-user.target
   - `sign_tool -sign` 生成授权证书
   - `gpbx -reg` 注册授权证书
 
-## 赞赏支持
-
-如果你觉得这个项目对你有帮助，欢迎扫码支持：
-
-![微信收款码](https://gitee.com/kolonse_zhjsh/gpbx/raw/master/%E8%B5%8F%E8%B5%90.jpg)
-
 ## 常见问题 (FAQ)
 
 <details>
