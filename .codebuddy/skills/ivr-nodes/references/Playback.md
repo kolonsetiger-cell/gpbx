@@ -2,32 +2,31 @@
 
 仅播放语音文件，不做任何交互。适合提示语、等待音、结束语。
 
-## 节点定义（来源: `skill.lua`）
+## 节点定义（来源: `ivrs/skill.lua`）
 
 ```lua
 local Playback = {}
 Playback.__index = Playback
+
 function Playback:new(file)
     local self = setmetatable({}, Playback)
     self.file = file
     self.parent_node = nil
-    self.outputs = nil
-    self.error = nil
-    self.next_node = nil
+    self.outputs    = nil
+    self.error      = nil
+    self.next_node  = nil
     return self
 end
 
 function Playback:do_action()
     engine:playback(self.file)
-    self.outputs = self.parent_node.outputs
+    self.outputs = self.parent_node and self.parent_node.outputs or {}
     return self.next_node
 end
 
 function Playback:connect(node)
     self.next_node = node
-    if node == nil then
-        return self
-    end
+    if node == nil then return self end
     node.parent_node = self
     return self
 end
@@ -48,9 +47,9 @@ end
 
 ## 输出
 
-不产生新输出，`self.outputs` 继承自 `self.parent_node.outputs`。
+不产生新输出，`self.outputs` 继承自 `self.parent_node.outputs`（含 `or {}` 保护）。
 
-## 使用样例（来源: `demo.lua`）
+## 使用样例（来源: `ivrs/demo.lua`）
 
 ### 播放等待提示后继续
 

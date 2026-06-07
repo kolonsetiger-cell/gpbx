@@ -22,7 +22,7 @@ end
 
 function PlayAndGetDigit:do_action()
     local get_digit = engine:play_and_get_digit(self.file, self.hope_digit, self.timeout)
-    self.outputs = self.parent_node.outputs
+    self.outputs = self.parent_node and self.parent_node.outputs or {}
     if #get_digit == 0 then
         return self.fail_node
     end

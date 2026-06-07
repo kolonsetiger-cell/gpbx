@@ -22,6 +22,9 @@ function Loop:do_action()
     if self.loop_count == 0 then
         return self.fail_node
     end
+    if self.loop_count == -1 then
+        return self.next_node
+    end
     self.loop_count = self.loop_count - 1
     return self.next_node
 end
@@ -31,7 +34,7 @@ function Loop:connect(node)
     if node == nil then
         return self
     end
-    node.parent_node = self.parent_node
+    node.parent_node = self
     return self
 end
 

@@ -2,28 +2,29 @@
 
 播放语音文件，等待用户输入多位数字，用户按指定结束键（DTMF）时停止输入。与 `PlayAndGetDigits` 的区别在于可以指定一个 DTMF 键作为输入结束标志（如 `#`）。
 
-## 节点定义（来源: `skill.lua`）
+## 节点定义（来源: `ivrs/skill.lua`）
 
 ```lua
 local PlayAndGetDigitsWithEnd = {}
 PlayAndGetDigitsWithEnd.__index = PlayAndGetDigitsWithEnd
+
 function PlayAndGetDigitsWithEnd:new(file, hope_dtmf, timeout)
     local self = setmetatable({}, PlayAndGetDigitsWithEnd)
-    self.file = file
-    self.hope_dtmf = hope_dtmf
-    self.timeout = timeout
-    self.parent_node = nil
-    self.outputs = nil
-    self.error = nil
+    self.file       = file
+    self.hope_dtmf  = hope_dtmf
+    self.timeout    = timeout
+    self.parent_node  = nil
+    self.outputs     = nil
+    self.error       = nil
     self.success_node = nil
-    self.fail_node = nil
-    self.output = nil
+    self.fail_node    = nil
+    self.output      = nil
     return self
 end
 
 function PlayAndGetDigitsWithEnd:do_action()
     local get_digits = engine:play_and_get_digits_with_end(self.file, self.hope_dtmf, self.timeout)
-    self.outputs = self.parent_node.outputs
+    self.outputs = self.parent_node and self.parent_node.outputs or {}
     if #get_digits == 0 then
         return self.fail_node
     end
@@ -34,18 +35,14 @@ end
 
 function PlayAndGetDigitsWithEnd:success_connect(node)
     self.success_node = node
-    if node == nil then
-        return self
-    end
+    if node == nil then return self end
     node.parent_node = self
     return self
 end
 
 function PlayAndGetDigitsWithEnd:fail_connect(node)
     self.fail_node = node
-    if node == nil then
-        return self
-    end
+    if node == nil then return self end
     node.parent_node = self
     return self
 end

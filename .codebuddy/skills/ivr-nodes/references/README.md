@@ -29,7 +29,7 @@
 | 等待+校验 | `PlayAndRequestPost → IfElse` |
 | 动态注入上游输出 | `PlayAndRequestPost:bind_node_output` / `HttpPost:bind_node_output` |
 
-## 完整流程示例（来源: `demo.lua`）
+## 完整流程示例（来源: `ivrs/demo.lua`）
 
 ```
 Root
@@ -60,7 +60,7 @@ Root
 
 ## 节点输出继承链
 
-每个节点在 `do_action()` 中执行 `self.outputs = self.parent_node.outputs`，然后 `table.insert` 自己的结果。
+每个节点在 `do_action()` 中执行 `self.outputs = self.parent_node and self.parent_node.outputs or {}`，然后 `table.insert` 自己的结果。
 
 下游节点通过 `self.outputs[#self.outputs]` 获取最后一个输出：
 

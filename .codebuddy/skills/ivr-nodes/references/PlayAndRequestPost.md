@@ -2,23 +2,24 @@
 
 播放等待音（如音乐），同时向后端发送 JSON POST 请求，等待响应后继续。
 
-## 节点定义（来源: `skill.lua`）
+## 节点定义（来源: `ivrs/skill.lua`）
 
 ```lua
 local PlayAndRequestPost = {}
 PlayAndRequestPost.__index = PlayAndRequestPost
+
 function PlayAndRequestPost:new(file, url, body, timeout)
     local self = setmetatable({}, PlayAndRequestPost)
-    self.file = file
-    self.url = url
-    self.body = body
-    self.timeout = timeout
+    self.file     = file
+    self.url      = url
+    self.body     = body or {}
+    self.timeout  = timeout
     self.parent_node = nil
-    self.outputs = nil
-    self.error = nil
+    self.outputs     = nil
+    self.error       = nil
     self.success_node = nil
-    self.fail_node = nil
-    self.bindings = {}
+    self.fail_node    = nil
+    self.bindings    = {}  -- bind_node_output 注册的回调函数列表
     return self
 end
 
@@ -27,10 +28,11 @@ function PlayAndRequestPost:bind_node_output(func_bind)
 end
 
 function PlayAndRequestPost:do_action()
+    -- 合并前面节点的输出到 body
     for _, binding in ipairs(self.bindings) do
-        local body = binding(self)
-        if body ~= nil then
-            deepMerge(self.body, body)
+        local body_part = binding(self)
+        if body_part ~= nil then
+            self.body = deepMerge(self.body, body_part)
         end
     end
 
@@ -38,25 +40,21 @@ function PlayAndRequestPost:do_action()
     if err ~= nil then
         return self.fail_node
     end
-    self.outputs = self.parent_node.outputs
+    self.outputs = self.parent_node and self.parent_node.outputs or {}
     table.insert(self.outputs, response)
     return self.success_node
 end
 
 function PlayAndRequestPost:success_connect(node)
     self.success_node = node
-    if node == nil then
-        return self
-    end
+    if node == nil then return self end
     node.parent_node = self
     return self
 end
 
 function PlayAndRequestPost:fail_connect(node)
     self.fail_node = node
-    if node == nil then
-        return self
-    end
+    if node == nil then return self end
     node.parent_node = self
     return self
 end
@@ -68,7 +66,7 @@ end
 |------|------|------|
 | `file` | string | 等待音文件（通常 `"local_stream://moh"` 音乐保持） |
 | `url` | string | POST 请求的 URL |
-| `body` | table | 请求体（JSON 对象） |
+| `body` | table | 请求体（JSON 对象，默认 `{}`） |
 | `timeout` | number | 超时时间(毫秒) |
 
 ## 方法
@@ -102,7 +100,7 @@ end)
 
 `self.outputs` 追加 `response`（服务端响应数据，通常含 `.code` 字段）
 
-## 使用样例（来源: `demo.lua`）
+## 使用样例（来源: `ivrs/demo.lua`）
 
 ### 首次校验
 

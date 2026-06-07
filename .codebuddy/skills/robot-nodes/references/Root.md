@@ -1,12 +1,13 @@
 # Root — 根节点
 
-IVR 流程的入口节点，不执行任何操作，仅作为流程起点。
+机器人流程的入口节点，不执行任何操作，仅作为流程起点。
 
-## 节点定义（来源: `skill.lua`）
+## 节点定义（来源: `robots/skill.lua`）
 
 ```lua
 local Root = {}
 Root.__index = Root
+
 function Root:new()
     local self = setmetatable({}, Root)
     self.outputs = {}
@@ -26,7 +27,7 @@ function Root:connect(node)
         return self
     end
     node.parent_node = self
-    return self
+    return Root
 end
 ```
 
@@ -45,13 +46,17 @@ end
 | `connect(node)` | 设置第一个要执行的节点 |
 | `do_action()` | 返回 `next_node` |
 
-## 使用样例（来源: `demo.lua`）
+## 使用样例（来源: `robots/demo.lua`）
 
 ```lua
-local root = Root:new()
+local skill = require("robots/skill")
+local Root = skill.Root
+local Loop = skill.Loop
 
--- 连接到第一个节点
-root:connect(node_welcom_press_1)
+local root = Root:new()
+local loop = Loop:new(-1)
+
+root:connect(loop)
 
 -- 主循环
 local node = root

@@ -2,28 +2,29 @@
 
 根据条件函数判断结果，路由到不同分支（支持 if/elseif/else）。
 
-## 节点定义（来源: `skill.lua`）
+## 节点定义（来源: `ivrs/skill.lua`）
 
 ```lua
 local IfElse = {}
 IfElse.__index = IfElse
+
 function IfElse:new()
     local self = setmetatable({}, IfElse)
-    self.condition = nil
-    self.true_node = nil
-    self.elseif_node = {}
-    self.else_node = nil
-    self.inputs = nil
+    self.condition    = nil
+    self.true_node    = nil
+    self.elseif_node  = {}  -- 格式：{ condition = func, node = node }
+    self.else_node    = nil
+    self.inputs       = nil
     return self
 end
 
 function IfElse:do_action()
-    self.outputs = self.parent_node.outputs
-    if self.condition(self) then
+    self.outputs = self.parent_node and self.parent_node.outputs or {}
+    if self.condition and self.condition(self) then
         return self.true_node
     end
-    for i, v in ipairs(self.elseif_node) do
-        if v.condition(self) then
+    for _, v in ipairs(self.elseif_node) do
+        if v.condition and v.condition(self) then
             return v.node
         end
     end
@@ -33,26 +34,22 @@ end
 function IfElse:if_connect(condition, node)
     self.true_node = node
     self.condition = condition
-    if node == nil then
-        return self
-    end
+    if node == nil then return self end
     node.parent_node = self
     return self
 end
 
 function IfElse:else_connect(node)
     self.else_node = node
-    if node == nil then
-        return self
-    end
+    if node == nil then return self end
     node.parent_node = self
     return self
 end
 
+-- 添加 elseif 分支（可多次调用）
 function IfElse:ifelse_connect(condition, node)
-    self.else_node = node
     node.parent_node = self
-    table.insert(self.elseif_node, {condition = condition, node = node})
+    table.insert(self.elseif_node, { condition = condition, node = node })
     return self
 end
 ```
@@ -62,7 +59,7 @@ end
 | 方法 | 说明 |
 |------|------|
 | `if_connect(condition_fn, node)` | 设置 if 条件分支 |
-| `ifelse_connect(condition_fn, node)` | 追加 elseif 条件分支 |
+| `ifelse_connect(condition_fn, node)` | 追加 elseif 条件分支（可多次调用） |
 | `else_connect(node)` | 设置 else 分支（所有条件不满足时） |
 | `do_action()` | 依次判断条件，返回匹配的分支节点 |
 
@@ -77,7 +74,7 @@ function(ifelse_node)  -- self = ifelse_node
 end
 ```
 
-## 使用样例（来源: `demo.lua`）
+## 使用样例（来源: `ivrs/demo.lua`）
 
 ### 基本 if/else — 校验结果判断
 
