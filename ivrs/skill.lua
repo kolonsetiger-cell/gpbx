@@ -283,7 +283,7 @@ end
 local HttpPost = {}
 HttpPost.__index = HttpPost
 function HttpPost:new(url, header, body, timeout)
-    local self = setmetatable({}, PlayAndGetDigit)
+    local self = setmetatable({}, HttpPost)
     self.url = url
     self.header = header
     self.body = body
@@ -365,7 +365,7 @@ end
 local Loop = {}
 Loop.__index = Loop
 function Loop:new(loop_count)
-    local self = setmetatable({}, Playback)
+    local self = setmetatable({}, Loop)
     self.parent_node = nil
     self.outputs = nil
     self.error = nil

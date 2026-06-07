@@ -56,7 +56,7 @@ func (l *LuaEngine) setAsr(asr string) {
 	}
 }
 
-func (l *LuaEngine) LLMSayOutJson(prompt, text string, timeout_ms int) (map[string]interface{}, error) {
+func (l *LuaEngine) LLMSayOutJson(prompt, text string, timeout_ms int) (map[string]any, error) {
 	if l.ai == nil {
 		return nil, nil
 	}

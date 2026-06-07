@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/safejob/dify-sdk-go"
@@ -25,7 +26,7 @@ func (o *ai_dify) Load(model, url, token string, max_history int) (err error) {
 	return err
 }
 
-func (o *ai_dify) agentSay(prompt string, text string, timeout_ms int) (string, error) {
+func (o *ai_dify) agentSay(_ string, text string, _ int) (string, error) {
 	ctx := context.Background()
 	eventCh, meta := o.client.AgentApp().Run(ctx, types.ChatRequest{
 		Query:          text,
@@ -33,11 +34,11 @@ func (o *ai_dify) agentSay(prompt string, text string, timeout_ms int) (string, 
 		ConversationId: o.conversationId,
 	}).SimplePrint()
 	o.conversationId = meta.ConversationId
-	var answer string
+	var answer strings.Builder
 	for msg := range eventCh {
-		answer += msg
+		answer.WriteString(msg)
 	}
-	return answer, nil
+	return answer.String(), nil
 }
 
 func (o *ai_dify) Say(prompt string, text string, timeout_ms int) (string, error) {
