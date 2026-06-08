@@ -22,6 +22,9 @@ var defaultLogger log.Logger
 type ai_vendor interface {
 	Load(model, url, token string, max_history int) error
 	Say(prompt string, text string, timeout_ms int) (string, error)
+	// SayStream 流式调用大模型，每收到一个完整分段就回调 onSegment，最后返回完整内容
+	// prefilled: 预填 assistant 开头（如 "好的，我来帮您处理："），减少首 token 延迟
+	SayStream(prefilled string, prompt string, text string, timeout_ms int, onSegment func(segment string)) (string, error)
 }
 
 type AI struct {

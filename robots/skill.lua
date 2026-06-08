@@ -244,6 +244,68 @@ end
 
 skill.LLMSayRaw = LLMSayRaw
 
+-- ==================== LLMSayStream ====================
+-- 流式调用 LLM，按自然断句（标点符号）分段，
+-- 每收到一个分段立即 TTS 播报给用户，减少等待延迟感
+-- prefilled: 预填 assistant 开头（如 "好的，"），可为空字符串
+local LLMSayStream = {}
+LLMSayStream.__index = LLMSayStream
+
+function LLMSayStream:new(prompt, timeout, prefilled)
+    local self = setmetatable({}, LLMSayStream)
+    self.prompt    = prompt
+    self.timeout   = timeout
+    self.prefilled = prefilled or ""
+    self.parent_node  = nil
+    self.outputs      = nil
+    self.output       = nil
+    self.error        = nil
+    self.success_node = nil
+    self.fail_node    = nil
+    self.bindings     = {}
+    return self
+end
+
+function LLMSayStream:bind_node_output(func_bind)
+    table.insert(self.bindings, func_bind)
+end
+
+function LLMSayStream:do_action()
+    local text = ""
+    for _, binding in ipairs(self.bindings) do
+        local body = binding(self)
+        if body ~= nil then
+            text = text .. body
+        end
+    end
+    -- 调用 engine:llm_say_stream(prefilled, prompt, text, timeout)
+    -- 每收到一个分段，engine 内部会自动调用 say() 播报给用户
+    local response, err = engine:llm_say_stream(self.prefilled, self.prompt, text, self.timeout)
+    self.outputs = self.parent_node and self.parent_node.outputs or {}
+    if err ~= nil or response == nil or #response == 0 then
+        return self.fail_node
+    end
+    self.output = response
+    table.insert(self.outputs, { response })
+    return self.success_node
+end
+
+function LLMSayStream:success_connect(node)
+    self.success_node = node
+    if node == nil then return self end
+    node.parent_node = self
+    return self
+end
+
+function LLMSayStream:fail_connect(node)
+    self.fail_node = node
+    if node == nil then return self end
+    node.parent_node = self
+    return self
+end
+
+skill.LLMSayStream = LLMSayStream
+
 -- ==================== Loop ====================
 -- 循环节点：loop_count = -1 表示无限循环，
 -- 0 表示直接跳到 fail_node，>0 表示剩余循环次数

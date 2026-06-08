@@ -82,6 +82,22 @@ func (l *LuaEngine) LLMSayOutRaw(prompt, text string, timeout_ms int) (string, e
 	}
 	return out, nil
 }
+
+// LLMSayStream 流式调用大模型，每收到一个完整分段就通过 Say 播报给用户
+// prefilled: 预填 assistant 开头（如 "好的，"），可为空
+func (l *LuaEngine) LLMSayStream(prefilled, prompt, text string, timeout_ms int) (string, error) {
+	if l.ai == nil {
+		return "", nil
+	}
+	out, err := l.ai.SayStream(prefilled, prompt, text, timeout_ms, func(segment string) {
+		// 每收到一个完整分段，立即 TTS 播报给用户
+		_ = l.Say(segment)
+	})
+	if err != nil {
+		return "", err
+	}
+	return out, nil
+}
 func (l *LuaEngine) EnableAsr(enable_asr bool) {
 	l.enable_asr = enable_asr
 }
@@ -643,6 +659,23 @@ func (l *LuaEngine) do() {
 				return 2
 			}
 
+			ls.Push(lua.LString(out))
+			ls.Push(lua.LNil)
+			return 2
+		}))
+		l.lu.SetField(table, "llm_say_stream", l.lu.NewFunction(func(ls *lua.LState) int {
+			ls.CheckTable(1)
+			prefilled := ls.CheckString(2)  // 预填内容，可为空字符串
+			prompt := ls.CheckString(3)
+			text := ls.CheckString(4)
+			timeout_ms := ls.CheckNumber(5)
+			out, err := l.LLMSayStream(prefilled, prompt, text, int(timeout_ms))
+			if err != nil {
+				defaultLogger.Error(ThisModule, "<%v> LLMSayStream %v, Result: <%v:%v>", l.file, prompt, err)
+				ls.Push(lua.LNil)
+				ls.Push(lua.LString(err.Error()))
+				return 2
+			}
 			ls.Push(lua.LString(out))
 			ls.Push(lua.LNil)
 			return 2

@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/openai/openai-go/v3"
@@ -67,6 +68,100 @@ func (o *ai_openai) Say(prompt string, text string, timeout_ms int) (string, err
 		o.messages = o.messages[1:]
 	}
 	return resp.Choices[0].Message.Content, nil
+}
+
+// SayStream 流式调用大模型，按自然断句（标点符号）分段回调
+// prefilled: 预填 assistant 开头内容，减少首 token 延迟，可为空
+// onSegment: 每收到一个完整分段时回调（累积到标点符号后输出）
+func (o *ai_openai) SayStream(prefilled string, prompt string, text string, timeout_ms int, onSegment func(segment string)) (string, error) {
+	if timeout_ms < 0 {
+		timeout_ms = 10000
+	}
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if timeout_ms > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(timeout_ms)*time.Millisecond)
+		defer cancel()
+	} else {
+		ctx = context.Background()
+	}
+
+	messages := []openai.ChatCompletionMessageParamUnion{
+		openai.SystemMessage(prompt),
+	}
+	messages = append(messages, o.messages...)
+	messages = append(messages, openai.UserMessage(text))
+
+	// 预填 assistant 开头，模型会接着写，大幅减少首 token 延迟
+	if prefilled != "" {
+		messages = append(messages, openai.AssistantMessage(prefilled))
+	}
+
+	stream := o.client.Chat.Completions.NewStreaming(ctx, openai.ChatCompletionNewParams{
+		Model:    o.model,
+		Messages: messages,
+	})
+
+	var fullText strings.Builder
+	var segmentBuffer strings.Builder
+	first := true
+
+	for stream.Next() {
+		chunk := stream.Current()
+		if len(chunk.Choices) == 0 {
+			continue
+		}
+		delta := chunk.Choices[0].Delta.Content
+		if delta == "" {
+			continue
+		}
+
+		// 第一个 token 到达后，先回调预填内容（作为第一个分段）
+		if first && prefilled != "" {
+			if onSegment != nil {
+				onSegment(prefilled)
+			}
+			fullText.WriteString(prefilled)
+			first = false
+		}
+
+		fullText.WriteString(delta)
+		segmentBuffer.WriteString(delta)
+
+		// 遇到自然断句标点（中英文），将积攒的内容作为一个分段回调
+		if strings.ContainsAny(delta, "。！？\n!?.;;；") {
+			seg := segmentBuffer.String()
+			segmentBuffer.Reset()
+			if onSegment != nil {
+				onSegment(seg)
+			}
+		}
+	}
+
+	// 输出剩余未断句的内容
+	if segmentBuffer.Len() > 0 {
+		seg := segmentBuffer.String()
+		if onSegment != nil {
+			onSegment(seg)
+		}
+	}
+
+	if err := stream.Err(); err != nil {
+		return "", err
+	}
+
+	result := fullText.String()
+	if result == "" {
+		return "", errors.New("empty response from AI stream")
+	}
+
+	// 保存到历史
+	o.messages = append(o.messages, openai.AssistantMessage(result))
+	if len(o.messages) >= o.max_history {
+		o.messages = o.messages[1:]
+	}
+
+	return result, nil
 }
 
 func NewAIOpenAI() *ai_openai {

@@ -49,6 +49,51 @@ func (o *ai_dify) Say(prompt string, text string, timeout_ms int) (string, error
 	return "", nil
 }
 
+// SayStream 流式调用 Dify，按自然断句分段回调
+func (o *ai_dify) SayStream(prefilled string, prompt string, text string, timeout_ms int, onSegment func(segment string)) (string, error) {
+	ctx := context.Background()
+	eventCh, meta := o.client.AgentApp().Run(ctx, types.ChatRequest{
+		Query:          text,
+		Inputs:         map[string]any{},
+		ConversationId: o.conversationId,
+	}).SimplePrint()
+	o.conversationId = meta.ConversationId
+
+	// 先回调预填内容
+	if prefilled != "" && onSegment != nil {
+		onSegment(prefilled)
+	}
+
+	var fullText strings.Builder
+	var segmentBuffer strings.Builder
+	if prefilled != "" {
+		fullText.WriteString(prefilled)
+	}
+
+	for msg := range eventCh {
+		fullText.WriteString(msg)
+		segmentBuffer.WriteString(msg)
+
+		// 遇到自然断句标点，将积攒内容作为分段回调
+		if strings.ContainsAny(msg, "。！？\n!?.;;；") {
+			seg := segmentBuffer.String()
+			segmentBuffer.Reset()
+			if onSegment != nil {
+				onSegment(seg)
+			}
+		}
+	}
+
+	// 输出剩余内容
+	if segmentBuffer.Len() > 0 {
+		if onSegment != nil {
+			onSegment(segmentBuffer.String())
+		}
+	}
+
+	return fullText.String(), nil
+}
+
 func NewAIDify() *ai_dify {
 	return &ai_dify{}
 }
