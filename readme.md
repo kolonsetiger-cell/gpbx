@@ -273,7 +273,7 @@ go build
 ```bash
 # 克隆仓库
 git clone https://gitee.com/kolonse_zhjsh/gpbx2.git
-cd gpbx
+cd gpbx2
 
 # 安装 Go 依赖
 go mod tidy
